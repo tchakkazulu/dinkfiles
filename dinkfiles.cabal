@@ -1,0 +1,27 @@
+Name:                dinkfiles
+Version:             0.1
+Synopsis:            Reading and writing of data files used by Dink Smallwood
+Description:         This library provides data structures and read/write
+                     functions for reading and writing several .dat files used
+                     by Dink Smallwood. The current version supports reading
+                     and writing hard.dat, dink.dat, and map.dat.
+                     When writing files, backing up the original files is
+                     highly recommended, as this functionality hasn't been
+                     thoroughly tested yet.
+
+Homepage:            http://github.com/tchakkazulu/dinkfiles
+License:             BSD3
+License-file:        LICENSE
+Author:              Joeri van Eekelen
+Maintainer:          j.v.eekelen@gmail.com
+Category:            Game
+Build-type:          Simple
+Extra-source-files:  README
+Cabal-version:       >=1.2
+
+Library
+  Exposed-modules:     Game.Dink.Files.MapDat, Game.Dink.Files.HardDat, Game.Dink.Files.DinkDat
+  
+  -- Packages needed in order to build this package.
+  Build-depends:       base, bytestring, binary
+
