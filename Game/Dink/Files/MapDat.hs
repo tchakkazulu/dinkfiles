@@ -1,4 +1,4 @@
-module DinkFiles.MapDat where
+module Game.Dink.Files.MapDat where
 
 import Control.Monad
 

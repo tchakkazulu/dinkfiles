@@ -1,1 +1,6 @@
-dinkfiles, a Haskell library for reading and writing data files used by Dink Smallwood
+dinkfiles, a Haskell library for reading and writing data files used by Dink Smallwood.
+
+Currently has support for hard.dat, dink.dat and map.dat. The datatypes aren't stable yet,
+particularly, there may be some arrays that can probably be changed to something else.
+Writing structures back to a file is untested, but should work. Backup just in case.
+

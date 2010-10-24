@@ -1,4 +1,4 @@
-module DinkFiles.HardDat where
+module Game.Dink.Files.HardDat where
 
 import Control.Monad
 

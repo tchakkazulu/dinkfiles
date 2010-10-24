@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 
-module DinkFiles.DinkDat where
+module Game.Dink.Files.DinkDat where
 
 import Control.Monad
 
