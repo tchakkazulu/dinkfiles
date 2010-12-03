@@ -8,8 +8,11 @@ import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
 
+import Debug.Trace
+
 import qualified Data.Array.IArray as A
-import Data.Ix
+
+import CStructUtil
 
 data HardType = No | Low | High | Mystery
   deriving (Eq, Show)
@@ -44,33 +47,33 @@ fromTile' t = let (p,y,x) = toTup t
 instance Ord Tile where
   compare t1 t2 = compare (toTup t1) (toTup t2)
 
-instance Ix Tile where
-  range (a,b) = map fromTup $ range ((toTup a), (toTup b))
-  index (a,b) c = index (toTup a, toTup b) (toTup c)
-  inRange (a,b) c = inRange (toTup a, toTup b) (toTup c)
-  rangeSize (a,b) = rangeSize (toTup a, toTup b)
+instance A.Ix Tile where
+  range (a,b) = map fromTup $ A.range ((toTup a), (toTup b))
+  index (a,b) c = A.index (toTup a, toTup b) (toTup c)
+  inRange (a,b) c = A.inRange (toTup a, toTup b) (toTup c)
+  rangeSize (a,b) = A.rangeSize (toTup a, toTup b)
 
-newtype HardDat = HardDat (A.Array Int (A.Array (Int,Int) HardType), A.Array Tile Int)
+newtype HardDat = HardDat (A.Array Int (A.Array (Int,Int) HardType, Bool), A.Array Tile Int)
+  deriving (Eq)
 
 instance Binary HardDat where
   get = do
     htypes <- replicateM 800 $ do
       theData <- replicateM (51*51) get
-      skip 1
-      skip 4
-      return theData
-    tilerefs <- replicateM 3936 $ fmap fromIntegral getWord32le
-    skip (4*(8000-3936))
+      used <- getBool
+      skip 2 -- for alignment padding
+      skip 4 -- unused hold field
+      return (theData, used)
+    tilerefs <- replicateM 8000 $ getInt
     return (mkHardDat htypes tilerefs)
   put (HardDat (htypes, tilerefs)) = do
-    forM_ (A.elems htypes) $ \a -> do
+    forM_ (A.elems htypes) $ \(a,used) -> do
       forM_ (A.elems a) put
-      junk 1
-      junk 4
-    forM_ (A.elems tilerefs) put
-
-junk :: Int -> Put
-junk n = replicateM_ n (putWord8 0)
+      putBool used
+      junk 2 -- alignment padding
+      junk 4 -- unused hold field
+    forM_ [0..7999] $ \i -> if inRange (toTile' i) then putInt (tilerefs A.! toTile' i)
+                                                   else putInt 0
 
 instance Binary HardType where
   get = toHardType `fmap` getWord8
@@ -87,11 +90,14 @@ fromHardType :: HardType -> Word8
 fromHardType No      = 0
 fromHardType Low     = 1
 fromHardType High    = 2
-fromhardType Mystery = 3
+fromHardType Mystery = 3
 
-mkHardDat :: [[HardType]] -> [Int] -> HardDat
+mkHardDat :: [([HardType],Bool)] -> [Int] -> HardDat
 mkHardDat htypes tilerefs = HardDat (A.array (1,800) htypes', A.array (tileStart,tileEnd) tilerefs')
-  where htypes' = zip [1..800] $ map (A.array ((1,1),(51,51)) . zip indices) htypes
+  where htypes' = zip [1..800] $ map (\(hts, used) -> (A.array ((1,1),(51,51)) . zip indices $ hts,used)) htypes
         indices = [(a,b) | a <- [1..51], b <- [1..51]]
-        tilerefs' = zip (map toTile' [0..3935]) tilerefs
+        tilerefs' = filter (inRange . fst) $ zip (map toTile' [0..7999]) tilerefs
+
+inRange :: Tile -> Bool
+inRange = A.inRange (tileStart, tileEnd)
 

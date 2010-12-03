@@ -14,6 +14,8 @@ import Data.List
 
 import qualified Data.Array.IArray as A
 
+import CStructUtil
+
 getDinkDat :: FilePath -> IO (DinkDat Int)
 getDinkDat = liftM decode . BS.readFile
 
@@ -33,29 +35,31 @@ instance Functor DinkDat where
 mkScreenInfo :: Int -> Int -> Bool -> ScreenInfo Int
 mkScreenInfo mapnum music indoor = ScreenInfo music indoor (if mapnum == 0 then Nothing else Just mapnum)
 
-getMusics :: DinkDat Int -> [(Int,Int)]
-getMusics (DinkDat arr) = nub $ map (screenData . snd) $ A.assocs arr
+getMusics :: DinkDat a -> [Int]
+getMusics (DinkDat arr) = nub $ map screenMusic $ A.elems arr
 
 instance Binary (DinkDat Int) where
   get = do
-    skip 24
-    exists <- allScreenGet getExists
-    skip 4
-    musics <- allScreenGet getMusic
-    skip 4
+    skip 20 -- unused name field
+    skip 4 -- exists[0]. Seth hates 0.
+    exists <- allScreenGet getInt
+    skip 4 -- music[0]. Seth hates 0.
+    musics <- allScreenGet getInt
+    skip 4 -- indoor[0]. Seth hates 0.
     insides <- allScreenGet getInside
-    skip (40*4)
-    skip 80
+    skip (40*4) -- unused v field
+    skip 80     -- unused s field
     skip 2000
     return (mkDinkDat exists musics insides)
   put dinkdat = do
     let info = map snd (elems dinkdat)
-    junk 24
-    allScreenPut putExist (map screenData info)
+    junk 20
     junk 4
-    allScreenPut putMusic (map screenMusic info)
+    mapM_  putExists (map screenData info)
     junk 4
-    allScreenPut putInside (map screenIndoor info)
+    mapM_ putInt (map screenMusic info)
+    junk 4
+    mapM_ putInside (map screenIndoor info)
     junk (40*4)
     junk 80
     junk 2000
@@ -63,42 +67,26 @@ instance Binary (DinkDat Int) where
 allScreenGet :: Get a -> Get [a]
 allScreenGet = replicateM 768
 
-getExists :: Get Int
-getExists = do
-  this <- getWord32le
-  return (fromIntegral this)
 
-getMusic :: Get Int
-getMusic = do
-  this <- getWord32le
-  return (fromIntegral this)
-
+-- special, because int and not bool.
+-- Makes the functions from CStructUtil useless.
 getInside :: Get Bool
 getInside = do
   this <- getWord32le
   if this == 0 then return False
                else return True
 
-junk :: Int -> Put
-junk n = replicateM_ n (putWord8 0)
-
-allScreenPut :: (a -> Put) -> [a] -> Put
-allScreenPut = mapM_
-
-putExist :: Int -> Put
-putExist = putWord32le . fromIntegral
-
-putMusic :: Int -> Put
-putMusic = putWord32le . fromIntegral
-
 putInside :: Bool -> Put
 putInside True = putWord32le 1
 putInside False = putWord32le 0
 
+putExists :: Maybe Int -> Put
+putExists Nothing = putWord32le 0
+putExists (Just x) = putInt x
+
 mkDinkDat :: [Int] -> [Int] -> [Bool] -> DinkDat Int
 mkDinkDat exists musics insides = DinkDat (A.array (1,768) infos)
-  where infos = zip [1..] $ zipWith3 mkInfo exists musics insides
-        mkInfo exist music inside = ScreenInfo music inside exist
+  where infos = zip [1..] $ zipWith3 mkScreenInfo exists musics insides
 
 (!) :: DinkDat a -> Int -> ScreenInfo a
 (DinkDat arr) ! i = arr A.! i
