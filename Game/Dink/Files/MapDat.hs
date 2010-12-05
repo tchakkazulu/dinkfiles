@@ -15,7 +15,9 @@ import Data.Char
 import qualified Data.Array.IArray as A
 import Data.Ix
 
-import DinkFiles.HardDat
+import Game.Dink.Files.HardDat
+
+import CStructUtil
 
 getMapDat :: FilePath -> IO MapDat
 getMapDat = liftM decode . BS.readFile
@@ -28,6 +30,7 @@ getScreen mapdat scr = do
              get
 
 newtype MapDat = MapDat (A.Array Int DinkScreen)
+  deriving (Eq)
 
 instance Binary MapDat where
   get = do
@@ -37,7 +40,7 @@ instance Binary MapDat where
             then do
               x <- get
               (xs,count) <- loop
-              return ((x:xs),count+1)
+              return $ count `seq` ((x:xs),count+1)
             else return ([],0)
     (screens, count) <- loop
     return $ mkMapDat screens count
@@ -50,7 +53,7 @@ data DinkScreen = DinkScreen { scr_tiles :: A.Array (Int,Int) (Tile, Int)
                              , scr_sprites :: A.Array Int Sprite
                              , scr_script :: String
                              }
-  deriving Show
+  deriving (Eq,Show)
 
 -- A screen should be 31280 bytes
 instance Binary DinkScreen where
@@ -140,7 +143,7 @@ data Sprite = Sprite { sp_x :: Int
                      , sp_nohit :: Int
                      , sp_touch_damage :: Int
                      }
-  deriving Show
+  deriving (Eq, Show)
 
 
 -- A sprite should be 220 bytes
@@ -159,7 +162,7 @@ instance Binary Sprite where
   put spr = do
     mapM_ (putInt . ($spr)) $ [sp_x,sp_y,sp_seq,sp_frame,sp_type,sp_size, fromBool . sp_exists, sp_rotation, sp_special, sp_brain]
     mapM_ (putString 13 . ($spr)) $ [sp_script, sp_hit, sp_die, sp_talk]
-    mapM_ (putInt . ($spr)) $ [sp_speed,sp_base_walk,sp_base_idle,sp_base_attack,sp_timing,sp_que,fromBool . sp_hard]
+    mapM_ (putInt . ($spr)) $ [sp_speed,sp_base_walk,sp_base_idle,sp_base_attack,const 0,sp_timing,sp_que,fromBool . sp_hard]
     put (sp_trim spr)
     mapM_ putInt $ case sp_warp spr of
                      Nothing           -> [0,0,0,0]
@@ -173,28 +176,12 @@ toBool _ = True
 fromBool False = 0
 fromBool True = 1
 
-getInt :: Get Int
-getInt = fmap convert getWord32le
-  where convert :: Word32 -> Int
-        convert = fromIntegral
-
-putInt :: Int -> Put
-putInt = putWord32le . convert
-  where convert :: Int -> Word32
-        convert = fromIntegral
-
-getString :: Int -> Get String
-getString = fmap (takeWhile (/='\NUL') . map (chr . fromIntegral) . BS.unpack) . getLazyByteString . fromIntegral
-
-putString :: Int -> String -> Put
-putString num string = putLazyByteString . BS.pack . map (fromIntegral . ord) . take num $ string ++ repeat '\NUL'
-
 data Trim = Trim { trim_left :: Int
                  , trim_top :: Int
                  , trim_right :: Int
                  , trim_bottom :: Int
                  }
-  deriving Show
+  deriving (Eq,Show)
 
 instance Binary Trim where
   get = do
@@ -207,5 +194,5 @@ data Warp = Warp { warp_screen :: Int
                  , warp_x :: Int
                  , warp_y :: Int
                  }
-  deriving Show
+  deriving (Eq,Show)
 
