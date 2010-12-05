@@ -20,11 +20,13 @@ getDinkDat :: FilePath -> IO (DinkDat Int)
 getDinkDat = liftM decode . BS.readFile
 
 newtype DinkDat a = DinkDat (A.Array Int (ScreenInfo a))
+  deriving (Eq)
 
 data ScreenInfo a = ScreenInfo { screenMusic :: Int
                                , screenIndoor :: Bool
                                , screenData :: Maybe a
                                }
+  deriving (Eq)
 
 instance Functor ScreenInfo where
   fmap f si = si{screenData = fmap f (screenData si)}
